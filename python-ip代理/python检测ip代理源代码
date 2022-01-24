@@ -1,0 +1,166 @@
+# -*- coding:utf-8 -*-
+#
+import os
+import requests
+from lxml import etree
+import time
+
+iplist = []
+ok_ip = []
+
+os.remove("有效ip.txt")
+f = open("有效ip.txt", mode='a')
+
+# 这是总共的ip地址数据
+print('''        ======================================================================
+         ============================= 正在收集ip中... ==========================
+         ======================================================================''')
+
+
+def dailiip1():
+    # 这是第一个网址
+    url = 'http://www.66ip.cn/areaindex_35/index.html'
+    response = requests.get(url=url)
+    # print(response.text)
+
+    res_xpath = etree.HTML(response.text)
+
+    for node in res_xpath.xpath('//*[@id="footer"]/div/table//tr')[1:]:
+        iplist.append(str(node.xpath('./td[1]/text()')[0]) + ':' + str(node.xpath('./td[2]/text()')[0]))
+        # 把爬取的数据写到iplist里
+
+
+def dailiip2():
+    # 这是第二个网址
+    for i in range(28):  # 因为这个网址的ip很多，有28页
+        url = f'https://www.89ip.cn/index_{i}.html'  # 这是另一个网址
+        response = requests.get(url=url)
+        res_xpath = etree.HTML(response.text)
+
+        for node in res_xpath.xpath('//tr')[1:]:
+            list_ip = list(node.xpath('./td[1]/text()')[0])
+            list_duankou = list(node.xpath('./td[2]/text()')[0])
+            # 先把数据转换成列表
+
+            del list_ip[0:4]
+            del list_ip[len(list_ip) - 2:len(list_ip)]
+            del list_duankou[0:4]
+            del list_duankou[len(list_duankou) - 2:len(list_duankou)]
+            # 不知道为什么从这个网站上爬下来的数据有一堆缩进和换行，所以要删掉
+
+            str_ip = ''.join(list_ip)
+            str_duankou = ''.join(list_duankou)
+            # 然后再转换成字符串
+            iplist.append(f'{str_ip}:{str_duankou}')
+
+
+def dailiip3():
+    # 这是第三个网址
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36'
+    }
+    for i in range(28):  # 因为这个网址的ip很多，有28页
+        url = f'http://www.ip3366.net/?stype=1&page={i}'  # 这是另一个网址
+        response = requests.get(url=url, headers=headers)
+        res_xpath = etree.HTML(response.text)
+
+        for node in res_xpath.xpath('//*[@id="list"]/table//tr')[1:]:
+            str_ip = str(node.xpath('./td[1]/text()')[0])
+            str_duankou = str(node.xpath('./td[2]/text()')[0])
+            iplist.append(f'{str_ip}:{str_duankou}')
+
+
+def dailiip4():
+    # 这是第四个网址
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36'
+    }
+
+    url = f'https://http://www.66ip.cn/{1}.html'
+    try:
+        response = requests.get(url=url, headers=headers, timeout=5)
+        if response.status_code == 200:
+            res_xpath = etree.HTML(response.text)
+            for i in range(2000):  # 因为这个网址的ip很多，有2000多页，2000页就够了
+                url = f'https://http://www.66ip.cn/{i + 1}.html'
+                response = requests.get(url=url, headers=headers, timeout=5)
+                for node in res_xpath.xpath('//*[@id="main"]/div[1]/div[2]/div[1]/table//tr')[1:]:
+                    str_ip = str(node.xpath('./td[1]/text()')[0])
+                    str_duankou = str(node.xpath('./td[2]/text()')[0])
+                    iplist.append(f'{str_ip}:{str_duankou}')
+    except Exception as e:
+        print(f'请求失败{e}')
+
+
+def check_ip(timeoutt):
+    # 检查代理ip是否有效
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36'
+    }
+    timee = 0
+    for i in iplist:
+        print(f'正在检测ip：{i}中...')
+        proxies = {
+            'http': i,
+            'https': i
+        }
+        try:
+            response = requests.get('https://www.baidu.com', headers=headers, proxies=proxies, timeout=timeoutt)
+            if response.status_code == 200:
+                print(
+                    f'====================================================请求成功,ip：{i}========================================================')
+                f.write(i)
+                f.write('\n')
+                time.sleep(1)
+                ok_ip.append(i)
+        except Exception as e:
+            print(f'{e}\n请求失败，判为失效，ip：{i}\n===============================================这是第{timee}个')
+        timee += 1
+
+
+"""
+# 用来测试有没有反爬虫的代码
+url2 = 'https://www.kuaidaili.com/free/inha/1'  # 这一个网址不确定能不能用
+response = requests.get(url=url2)
+print(response.text)
+"""
+
+print("正在收集http://www.66ip.cn/areaindex_35/index.html的ip代理")
+dailiip1()
+print("正在收集https://www.89ip.cn/index_XXX.html的ip代理")
+dailiip2()
+print("正在收集http://www.ip3366.net/?stype=1&page=XXX的ip代理")
+dailiip3()
+print("正在收集https://http://www.66ip.cn/XXX.html的ip代理")
+dailiip4()
+
+for j in iplist:
+    print(j)
+
+time.sleep(1)
+
+print(f'收集完成！总共{len(iplist)}个ip')
+
+print('====================================================================\n'
+      '==========================  开始检测ip有效性...... ====================\n'
+      '====================================================================\n')
+
+time.sleep(1)
+
+timeouttt = input("请输入超时时间")
+check_ip(timeouttt)
+
+print('====================================================================\n'
+      '=============================  检测完成！  ===========================\n'
+      '====================================================================\n')
+
+for x in ok_ip:
+    print(x)
+
+print(f'总共{len(ok_ip)}个有效ip')
+
+time.sleep(1)
+
+print('正在导出ip中...')
+
+print('导出完成，请到此文件目录下 有效ip.txt 里查看')
